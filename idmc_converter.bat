@@ -9,8 +9,6 @@ REM ==========================================
 
 setlocal enabledelayedexpansion
 
-REM Define color codes for output
-REM Note: Color codes work in Windows 10+
 cls
 title IDMC to PySpark Converter - Windows Automation
 
@@ -42,8 +40,8 @@ echo Timestamp: %date% %time%
 echo Script Location: %SCRIPT_DIR%
 echo.
 
-REM Log the start
-echo [%date% %time%] Process Started >> "%LOG_FILE%"
+REM Clear and initialize log
+echo [%date% %time%] === NEW CONVERSION SESSION STARTED === > "%LOG_FILE%"
 
 REM ==========================================
 REM CHECK PYTHON INSTALLATION
@@ -81,24 +79,20 @@ echo Place your input file in:
 echo   %INPUT_DIR%
 echo.
 echo Files found:
-cd /d "%INPUT_DIR%" 2>nul
+pushd "%INPUT_DIR%"
 if exist "*.xml" (
     echo   - XML files:
     dir /b *.xml
+) else if exist "*.zip" (
+    echo   - ZIP files:
+    dir /b *.zip
+) else if exist "*.json" (
+    echo   - JSON files:
+    dir /b *.json
 ) else (
-    if exist "*.zip" (
-        echo   - ZIP files:
-        dir /b *.zip
-    ) else (
-        if exist "*.json" (
-            echo   - JSON files:
-            dir /b *.json
-        ) else (
-            echo   [No files found in input directory]
-        )
-    )
+    echo   [No files found in input directory]
 )
-cd /d "%SCRIPT_DIR%"
+popd
 echo.
 
 set /p INPUT_FILE="Enter input filename (with extension): "
@@ -106,6 +100,7 @@ set /p INPUT_FILE="Enter input filename (with extension): "
 if not exist "%INPUT_DIR%\%INPUT_FILE%" (
     echo.
     echo [ERROR] File not found: %INPUT_FILE%
+    echo Looking in: %INPUT_DIR%
     echo.
     pause
     exit /b 1
@@ -115,7 +110,7 @@ echo [%date% %time%] Input File Selected: %INPUT_FILE% >> "%LOG_FILE%"
 echo.
 
 REM ==========================================
-REM VALIDATE FILE EXTENSION - FIXED LOGIC
+REM VALIDATE FILE EXTENSION
 REM ==========================================
 echo Validating file format...
 for %%A in ("%INPUT_FILE%") do set "FILE_EXT=%%~xA"
@@ -195,7 +190,7 @@ echo ==========================================
 echo   STEP 3: CONVERTING TO PYSPARK CODE
 echo ==========================================
 echo.
-echo Processing: %INPUT_DIR%\%INPUT_FILE%
+echo Input File: %INPUT_DIR%\%INPUT_FILE%
 echo Output Directory: %OUTPUT_DIR%
 echo.
 
@@ -203,10 +198,8 @@ REM Create Python command to convert IDMC to PySpark
 echo Generating PySpark code from IDMC mapping...
 echo [%date% %time%] Starting IDMC to PySpark conversion >> "%LOG_FILE%"
 
-echo Executing: python "%PYTHON_SCRIPT%" "%INPUT_DIR%\%INPUT_FILE%" "%OUTPUT_DIR%"
-echo. >> "%LOG_FILE%"
-echo ========== CONVERSION OUTPUT ========== >> "%LOG_FILE%"
-
+REM Run Python with explicit output
+cd /d "%SCRIPT_DIR%"
 python "%PYTHON_SCRIPT%" "%INPUT_DIR%\%INPUT_FILE%" "%OUTPUT_DIR%" >> "%LOG_FILE%" 2>&1
 
 if errorlevel 1 (
@@ -215,17 +208,20 @@ if errorlevel 1 (
     echo.
     echo Debugging Information:
     echo ========================
-    echo Input Directory: %INPUT_DIR%
-    echo Files in input directory:
-    dir "%INPUT_DIR%"
+    echo Checking input file...
+    if exist "%INPUT_DIR%\%INPUT_FILE%" (
+        echo Input file found: %INPUT_DIR%\%INPUT_FILE%
+    ) else (
+        echo [ERROR] Input file not found!
+    )
     echo.
     echo Python version:
     python --version
     echo.
-    echo Testing Python XML module:
-    python -c "import xml.etree.ElementTree; print('XML module OK')"
+    echo Python path:
+    where python
     echo.
-    echo Full log output:
+    echo Log file contents:
     type "%LOG_FILE%"
     echo.
     echo [%date% %time%] Conversion Failed >> "%LOG_FILE%"
@@ -246,209 +242,27 @@ echo   STEP 4: VERIFYING OUTPUT
 echo ==========================================
 echo.
 
-if exist "%OUTPUT_DIR%\*.py" (
-    echo PySpark files generated:
-    dir /b "%OUTPUT_DIR%\*.py"
+set "OUTPUT_FOUND=0"
+for %%F in ("%OUTPUT_DIR%\*.py") do (
+    if exist "%%F" (
+        set "OUTPUT_FOUND=1"
+        echo PySpark file generated: %%~nxF
+    )
+)
+
+if %OUTPUT_FOUND%==1 (
     echo.
     echo [%date% %time%] Output Files Generated Successfully >> "%LOG_FILE%"
 ) else (
     echo [ERROR] No PySpark output files generated
     echo [%date% %time%] No Output Files Generated >> "%LOG_FILE%"
-    pause
-    exit /b 1
-)
-
-REM ==========================================
-REM STEP 5: GITHUB PUSH
-REM ==========================================
-echo.
-echo ==========================================
-echo   STEP 5: GITHUB REPOSITORY CONFIGURATION
-echo ==========================================
-echo.
-echo The PySpark code has been generated successfully!
-echo.
-echo To push the output to GitHub, you need to provide:
-echo   1. GitHub Repository URL
-echo   2. GitHub Personal Access Token (PAT)
-echo.
-
-set /p GITHUB_REPO="Enter GitHub Repository URL (e.g., https://github.com/username/repo): "
-
-if "%GITHUB_REPO%"=="" (
-    echo.
-    echo GitHub push skipped. Output files are available at:
-    echo %OUTPUT_DIR%
-    echo.
-    echo To push manually:
-    echo   1. Navigate to: %OUTPUT_DIR%
-    echo   2. Copy the .py files
-    echo   3. Commit to GitHub: git add . ^&^& git commit -m "Add IDMC to PySpark conversion output"
-    echo   4. Push: git push origin main
-    echo.
-    pause
-    exit /b 0
-)
-
-REM Validate GitHub URL
-echo.
-echo Validating GitHub URL...
-echo %GITHUB_REPO% | findstr /r "https://github.com/.*/.*" >nul
-if errorlevel 1 (
-    echo [ERROR] Invalid GitHub URL format
-    echo Expected: https://github.com/username/repo
     echo.
     pause
     exit /b 1
 )
 
-echo GitHub URL validated successfully!
-echo Repository: %GITHUB_REPO%
-echo.
-
 REM ==========================================
-REM STEP 6: GITHUB AUTHENTICATION
-REM ==========================================
-echo.
-echo ==========================================
-echo   STEP 6: GITHUB AUTHENTICATION
-echo ==========================================
-echo.
-echo You will be prompted for GitHub credentials.
-echo Use your Personal Access Token (PAT) as password.
-echo.
-echo Create a PAT at: https://github.com/settings/tokens
-echo Scopes needed: repo, workflow
-echo.
-
-set /p GITHUB_USER="Enter GitHub username: "
-
-if "%GITHUB_USER%"=="" (
-    echo GitHub authentication skipped.
-    echo.
-    pause
-    exit /b 0
-)
-
-REM Note: Password input is not directly supported in batch, so we'll use git credential manager
-echo.
-echo Git will use your system credentials manager for authentication.
-echo If you haven't configured credentials, you'll be prompted.
-echo.
-
-REM ==========================================
-REM STEP 7: CLONE/INIT GIT REPOSITORY
-REM ==========================================
-echo.
-echo ==========================================
-echo   STEP 7: GIT CONFIGURATION
-echo ==========================================
-echo.
-
-set "GIT_DIR=%SCRIPT_DIR%github_repo"
-
-REM Check if git is installed
-git --version >nul 2>&1
-if errorlevel 1 (
-    echo [ERROR] Git is not installed or not in PATH
-    echo Please install Git from: https://git-scm.com/download/win
-    echo.
-    pause
-    exit /b 1
-)
-
-REM Create git directory if it doesn't exist
-if not exist "%GIT_DIR%" (
-    echo Cloning GitHub repository...
-    git clone "%GITHUB_REPO%" "%GIT_DIR%" 2>&1
-    if errorlevel 1 (
-        echo [ERROR] Failed to clone repository
-        echo Please check:
-        echo   1. Repository URL is correct
-        echo   2. Repository is accessible
-        echo   3. Your credentials are valid
-        echo.
-        pause
-        exit /b 1
-    )
-) else (
-    echo Updating existing repository...
-    cd /d "%GIT_DIR%"
-    git pull origin main 2>&1
-    cd /d "%SCRIPT_DIR%"
-)
-
-echo Repository ready at: %GIT_DIR%
-echo.
-
-REM ==========================================
-REM STEP 8: COPY OUTPUT FILES TO GIT DIR
-REM ==========================================
-echo.
-echo ==========================================
-echo   STEP 8: COPYING OUTPUT FILES
-echo ==========================================
-echo.
-
-echo Copying PySpark files to repository...
-copy "%OUTPUT_DIR%\*.py" "%GIT_DIR%\" /Y >nul
-if errorlevel 1 (
-    echo [ERROR] Failed to copy files
-    pause
-    exit /b 1
-)
-
-echo Files copied successfully!
-dir /b "%GIT_DIR%\*.py"
-echo.
-
-REM ==========================================
-REM STEP 9: GIT COMMIT AND PUSH
-REM ==========================================
-echo.
-echo ==========================================
-echo   STEP 9: COMMITTING AND PUSHING
-echo ==========================================
-echo.
-
-cd /d "%GIT_DIR%"
-
-echo Setting git user configuration...
-git config user.name "%GITHUB_USER%" 2>nul
-git config user.email "%GITHUB_USER%@users.noreply.github.com" 2>nul
-
-echo Adding files to staging...
-git add *.py 2>nul
-
-echo Creating commit...
-set "COMMIT_MSG=Add IDMC to PySpark conversion output - %date% %time%"
-git commit -m "%COMMIT_MSG%" 2>&1
-
-if errorlevel 1 (
-    echo.
-    echo Note: Commit may have failed if there are no changes.
-    echo This is normal if files already exist in the repository.
-    echo.
-)
-
-echo Pushing to GitHub...
-git push origin main 2>&1
-if errorlevel 1 (
-    echo.
-    echo [WARNING] Push may have failed due to authentication
-    echo Files have been staged locally. You can push manually with:
-    echo   cd "%GIT_DIR%"
-    echo   git push origin main
-    echo.
-) else (
-    echo Push successful!
-)
-
-cd /d "%SCRIPT_DIR%"
-echo.
-
-REM ==========================================
-REM COMPLETION
+REM COMPLETION - SKIP GITHUB PUSH BY DEFAULT
 REM ==========================================
 echo.
 echo ==========================================
@@ -458,7 +272,6 @@ echo.
 echo Summary:
 echo   Input File: %INPUT_FILE%
 echo   Output Directory: %OUTPUT_DIR%
-echo   GitHub Repository: %GITHUB_REPO%
 echo   Log File: %LOG_FILE%
 echo.
 echo Generated PySpark files are available at:
