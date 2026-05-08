@@ -115,28 +115,39 @@ echo [%date% %time%] Input File Selected: %INPUT_FILE% >> "%LOG_FILE%"
 echo.
 
 REM ==========================================
-REM VALIDATE FILE EXTENSION
+REM VALIDATE FILE EXTENSION - FIXED LOGIC
 REM ==========================================
 echo Validating file format...
 for %%A in ("%INPUT_FILE%") do set "FILE_EXT=%%~xA"
 
+set "FILE_TYPE="
+
 if /i "%FILE_EXT%"==".xml" (
     set "FILE_TYPE=XML"
     echo File Type: XML (IDMC Mapping Definition)
-) else if /i "%FILE_EXT%"==".zip" (
-    set "FILE_TYPE=ZIP"
-    echo File Type: ZIP (Compressed Archive)
-) else if /i "%FILE_EXT%"==".json" (
-    set "FILE_TYPE=JSON"
-    echo File Type: JSON (JSON Configuration)
-) else (
-    echo [ERROR] Unsupported file format: %FILE_EXT%
-    echo Supported formats: .xml, .zip, .json
-    echo.
-    pause
-    exit /b 1
+    goto :extension_validated
 )
 
+if /i "%FILE_EXT%"==".zip" (
+    set "FILE_TYPE=ZIP"
+    echo File Type: ZIP (Compressed Archive)
+    goto :extension_validated
+)
+
+if /i "%FILE_EXT%"==".json" (
+    set "FILE_TYPE=JSON"
+    echo File Type: JSON (JSON Configuration)
+    goto :extension_validated
+)
+
+REM If we reach here, no valid extension was found
+echo [ERROR] Unsupported file format: %FILE_EXT%
+echo Supported formats: .xml, .zip, .json
+echo.
+pause
+exit /b 1
+
+:extension_validated
 echo [%date% %time%] File Type Validated: %FILE_TYPE% >> "%LOG_FILE%"
 echo.
 
@@ -198,6 +209,11 @@ if errorlevel 1 (
     echo.
     echo [ERROR] Conversion failed. Check log file: %LOG_FILE%
     echo [%date% %time%] Conversion Failed >> "%LOG_FILE%"
+    echo.
+    echo Showing last 20 lines of log file:
+    echo.
+    powershell -Command "Get-Content '%LOG_FILE%' -Tail 20"
+    echo.
     pause
     exit /b 1
 )
