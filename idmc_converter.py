@@ -80,6 +80,8 @@ class IDMCToPySpark:
             
         except Exception as e:
             print(f"Error parsing XML: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def generate_pyspark_code(self):
@@ -235,6 +237,8 @@ df_{lookup_name}.cache()
             
         except Exception as e:
             print(f"✗ Error saving PySpark code: {e}")
+            import traceback
+            traceback.print_exc()
             return False
     
     def convert(self):
@@ -270,6 +274,8 @@ df_{lookup_name}.cache()
                 
         except Exception as e:
             print(f"✗ Conversion error: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
 
@@ -286,15 +292,39 @@ def main():
     input_file = sys.argv[1]
     output_dir = sys.argv[2]
     
-    if not os.path.exists(input_file):
-        print(f"Error: Input file not found: {input_file}")
-        sys.exit(1)
-    
-    converter = IDMCToPySpark(input_file, output_dir)
-    
-    if converter.convert():
-        sys.exit(0)
-    else:
+    try:
+        print(f"DEBUG: Input file argument: {input_file}")
+        print(f"DEBUG: Output directory argument: {output_dir}")
+        print()
+        
+        if not os.path.exists(input_file):
+            print(f"Error: Input file not found: {input_file}")
+            print(f"Full path: {os.path.abspath(input_file)}")
+            print()
+            print("Checking if path exists...")
+            if os.path.exists(os.path.dirname(input_file)):
+                print(f"Directory exists: {os.path.dirname(input_file)}")
+                print("Files in directory:")
+                for f in os.listdir(os.path.dirname(input_file)):
+                    print(f"  - {f}")
+            sys.exit(1)
+        
+        # Ensure output directory exists
+        Path(output_dir).mkdir(parents=True, exist_ok=True)
+        print(f"Output directory ready: {output_dir}")
+        print()
+        
+        converter = IDMCToPySpark(input_file, output_dir)
+        
+        if converter.convert():
+            sys.exit(0)
+        else:
+            print("Conversion failed - check details above")
+            sys.exit(1)
+    except Exception as e:
+        print(f"FATAL ERROR: {e}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 
