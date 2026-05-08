@@ -203,17 +203,32 @@ REM Create Python command to convert IDMC to PySpark
 echo Generating PySpark code from IDMC mapping...
 echo [%date% %time%] Starting IDMC to PySpark conversion >> "%LOG_FILE%"
 
+echo Executing: python "%PYTHON_SCRIPT%" "%INPUT_DIR%\%INPUT_FILE%" "%OUTPUT_DIR%"
+echo. >> "%LOG_FILE%"
+echo ========== CONVERSION OUTPUT ========== >> "%LOG_FILE%"
+
 python "%PYTHON_SCRIPT%" "%INPUT_DIR%\%INPUT_FILE%" "%OUTPUT_DIR%" >> "%LOG_FILE%" 2>&1
 
 if errorlevel 1 (
     echo.
-    echo [ERROR] Conversion failed. Check log file: %LOG_FILE%
+    echo [ERROR] Python conversion failed!
+    echo.
+    echo Debugging Information:
+    echo ========================
+    echo Input Directory: %INPUT_DIR%
+    echo Files in input directory:
+    dir "%INPUT_DIR%"
+    echo.
+    echo Python version:
+    python --version
+    echo.
+    echo Testing Python XML module:
+    python -c "import xml.etree.ElementTree; print('XML module OK')"
+    echo.
+    echo Full log output:
+    type "%LOG_FILE%"
+    echo.
     echo [%date% %time%] Conversion Failed >> "%LOG_FILE%"
-    echo.
-    echo Showing last 20 lines of log file:
-    echo.
-    powershell -Command "Get-Content '%LOG_FILE%' -Tail 20"
-    echo.
     pause
     exit /b 1
 )
